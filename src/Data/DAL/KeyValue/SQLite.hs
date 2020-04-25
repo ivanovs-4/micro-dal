@@ -5,6 +5,7 @@ module Data.DAL.KeyValue.SQLite
 , createEngine
 , closeEngine
 , withEngine
+, optInMemory
 ) where
 
 import Control.Applicative ((<|>))
@@ -38,8 +39,16 @@ instance Semigroup SQLiteEngineOpts where
 instance IsString SQLiteEngineOpts where
   fromString s = SQLiteEngineOpts { dbName = pure s }
 
+optInMemory :: SQLiteEngineOpts
+optInMemory = mempty
+
 createEngine :: SQLiteEngineOpts -> IO SQLiteEngine
-createEngine opts = SQLiteEngine <$> open (fromMaybe ":memory:" $ dbName opts)
+createEngine opts = do
+  conn <- open (fromMaybe ":memory:" $ dbName opts)
+  -- FIXME: move this stuff to options
+  execute_ conn "PRAGMA journal_mode = WAL"
+  execute_ conn "PRAGMA synchronous = NORMAL"
+  pure $ SQLiteEngine conn
 
 closeEngine :: SQLiteEngine -> IO ()
 closeEngine e = close (conn e)
@@ -50,6 +59,7 @@ withEngine opts = bracket (createEngine opts) closeEngine
 instance (Store a, HasKey a) => SourceListAll a IO SQLiteEngine where
   listAll :: SQLiteEngine -> IO [a]
   listAll e = do
+    execute_ (conn e) [qc|create table if not exists {table} (k blob primary key, v blob)|]
     rows <- query_ (conn e) [qc|select v from {table}|] :: IO [Only ByteString]
     pure $ rights $ fmap (\(Only x) -> decode @a x) rows
     where
@@ -58,6 +68,7 @@ instance (Store a, HasKey a) => SourceListAll a IO SQLiteEngine where
 instance (Store a, Store (KeyOf a), HasKey a) => SourceStore a IO SQLiteEngine where
   load :: SQLiteEngine -> KeyOf a -> IO (Maybe a)
   load e k = do
+    execute_ (conn e) [qc|create table if not exists {table} (k blob primary key, v blob)|]
     bs <- query (conn e) [qc|select v from {table} where k = ?|] (Only (encode k)) :: IO [Only ByteString]
     case headMay bs of
       Just (Only v) -> pure $ either (const Nothing) (Just) (decode @a v)
@@ -67,7 +78,7 @@ instance (Store a, Store (KeyOf a), HasKey a) => SourceStore a IO SQLiteEngine w
 
   store :: SQLiteEngine -> a -> IO (KeyOf a)
   store e v = do
-    execute_ (conn e) [qc|create table if not exists {table} (k blob primary key, v blob not null)|]
+    execute_ (conn e) [qc|create table if not exists {table} (k blob primary key, v blob)|]
     execute (conn e)  [qc|insert or replace into {table} (k,v) values(?,?)|] (bkey,bval)
     pure (key v)
     where

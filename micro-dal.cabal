@@ -78,12 +78,16 @@ test-suite micro-dal-test
                        , TypeApplications
                        , TypeFamilies
 
-    other-modules:
+    other-modules: Data.DAL.DALSpec
     hs-source-dirs: test
-    build-depends: base >= 4 && < 5
-                 , micro-dal
+    build-depends: base >= 4 && < 5, micro-dal
+                 , containers
                  , hspec
                  , hspec-discover
+                 , hspec-expectations
+                 , QuickCheck
+                 , store
+                 , text
 
     build-tool-depends: hspec-discover:hspec-discover == 2.*
 
