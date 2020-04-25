@@ -19,13 +19,17 @@ extra-source-files:  CHANGELOG.md
 library
   exposed-modules:     Data.DAL
                      , Data.DAL.KeyValue.SQLite
+                     , Data.DAL.KeyValue.HashRef
 
   other-modules:       Data.DAL.Types
 
   -- other-extensions:
   build-depends:       base ^>=4.12.0.0
+                     , base58-bytestring
                      , bytestring
+                     , cryptonite
                      , interpolatedstring-perl6
+                     , memory
                      , safe
                      , sqlite-simple
                      , store

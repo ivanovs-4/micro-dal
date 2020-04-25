@@ -5,6 +5,12 @@ import Data.String(IsString(..))
 newtype NS a = NS { nsUnpack :: String }
                deriving(Show,Eq,Ord,IsString)
 
+instance Monoid (NS a) where
+  mempty = NS mempty
+
+instance Semigroup (NS a) where
+  (<>) (NS a) (NS b) = NS (a<>b)
+
 class HasKey a where
   data KeyOf a :: *
   key   :: a -> KeyOf a

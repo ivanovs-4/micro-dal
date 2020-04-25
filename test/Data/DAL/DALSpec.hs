@@ -1,8 +1,5 @@
 module Data.DAL.DALSpec (spec) where
 
-import Data.DAL
-import Data.DAL.KeyValue.SQLite
-
 import Control.Monad
 import Data.Data
 import Data.Map (Map)
@@ -19,6 +16,10 @@ import Test.Hspec
 import Test.Hspec.Expectations
 import Test.QuickCheck
 import Test.QuickCheck.Arbitrary
+
+import Data.DAL
+import Data.DAL.KeyValue.SQLite
+import Data.DAL.KeyValue.HashRef
 
 data SomeData = SomeData Word32 Word32
                 deriving (Eq,Ord,Show,Data,Generic)
