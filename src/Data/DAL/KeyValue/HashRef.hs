@@ -1,4 +1,3 @@
-{-# LANGUAGE UndecidableInstances #-}
 module Data.DAL.KeyValue.HashRef where
 
 import Crypto.Hash
@@ -27,29 +26,34 @@ instance Show B58 where
 instance IsString B58 where
   fromString s = fromJust $ B58 <$> decodeBase58 bitcoinAlphabet (BS8.pack s)
 
-newtype HashRef a = HashRef (Either B58 a)
-                    deriving(Eq,Ord,Data,Generic)
+newtype HashRef (ns :: Symbol) a = HashRef (Either B58 a)
+                                   deriving(Eq,Ord,Show,Data,Generic)
 
-hashRefValue :: Store a => a -> HashRef a
+instance (KnownSymbol n, Store a) => HasKey (HashRef n a) where
+  data KeyOf (HashRef n a) = HashRefKey ByteString deriving(Eq,Ord,Show,Generic)
+  key = HashRefKey . hashRefKey
+  ns = fromString (symbolVal (Proxy :: Proxy n))
+
+instance (KnownSymbol n, Store a) => Store (KeyOf (HashRef n a))
+
+hashRefUnpack :: HashRef n a -> Maybe a
+hashRefUnpack (HashRef (Left _)) = Nothing
+hashRefUnpack (HashRef (Right v)) = pure v
+
+hashRefPack :: Store a => a -> HashRef n a
+hashRefPack x = hashRefValue x
+
+hashRefValue :: Store a => a -> HashRef n a
 hashRefValue x = HashRef (Right x)
 
-hashRefRef :: Store a => a -> HashRef a
+hashRefRef :: Store a => a -> HashRef n a
 hashRefRef x = HashRef (Left (B58 q))
   where
     q = hashRefKey (HashRef (Right x))
 
-hashRefKey :: forall a . Store a => HashRef a -> ByteString
+hashRefKey :: Store a => HashRef n a -> ByteString
 hashRefKey (HashRef (Left (B58 s))) = s
 hashRefKey (HashRef (Right a)) = sha256
   where
     sha256 = BS.pack (BA.unpack (hash (encode a) :: Digest SHA256))
-
-
-class (KnownSymbol (CASName a), Store a) => HasHashKey a where
-  type CASName a :: Symbol
-
-instance (Store a, HasHashKey a) => HasKey a where
-  newtype KeyOf a = HashRefKey ByteString
-  key a = HashRefKey (hashRefKey (hashRefValue a))
-  ns = fromString (symbolVal (Proxy :: Proxy (CASName a)))
 

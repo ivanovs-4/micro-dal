@@ -34,6 +34,12 @@ instance HasKey SomeData where
   key (SomeData a _) = SomeDataKey a
   ns = "somedata"
 
+newtype SomeOtherData = SomeOtherData String
+                        deriving (Eq,Ord,Show,Generic,Store)
+
+type HashedInt = HashRef "ints" Int
+instance Store HashedInt
+
 instance Arbitrary SomeData where
   arbitrary = SomeData <$> arbitrary <*> arbitrary
 
@@ -72,3 +78,20 @@ spec = do
           pure ()
 
       pure ()
+
+  describe "DAL HashRef test" $ do
+    it "stores and restores some random values using HashRef" $ do
+      withEngine optInMemory $ \eng -> do
+
+        replicateM_ 1000 $ do
+          ivalues <- generate arbitrary :: IO [Int]
+          forM_ ivalues $ \i -> do
+            k <- store @HashedInt eng (hashRefPack i)
+            ii <- load @HashedInt eng k
+            Just i `shouldBe` (fromJust $ hashRefUnpack <$> ii)
+
+        pure ()
+
+      pure ()
+
+
