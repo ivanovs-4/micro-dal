@@ -1,10 +1,21 @@
 {-# LANGUAGE QuasiQuotes, ExtendedDefaultRules #-}
-module Data.DAL.KeyValue.SQLite where
+module Data.DAL.KeyValue.SQLite
+( SQLiteEngine
+, SQLiteEngineOpts
+, createEngine
+, closeEngine
+, withEngine
+) where
 
+import Control.Applicative ((<|>))
+import Control.Exception
 import Database.SQLite.Simple hiding (withTransaction)
 import Data.ByteString (ByteString)
 import Data.Either
+import Data.Maybe
+import Data.Monoid
 import Data.Store
+import Data.String (IsString(..))
 import qualified Database.SQLite.Simple as SQLite
 import Safe
 import Text.InterpolatedString.Perl6 (qq,qc)
@@ -12,6 +23,29 @@ import Text.InterpolatedString.Perl6 (qq,qc)
 import Data.DAL.Types
 
 newtype SQLiteEngine = SQLiteEngine { conn :: Connection }
+
+data SQLiteEngineOpts = SQLiteEngineOpts
+                        { dbName :: Maybe FilePath
+                        }
+
+instance Monoid SQLiteEngineOpts where
+  mempty = SQLiteEngineOpts { dbName = Nothing
+                            }
+
+instance Semigroup SQLiteEngineOpts where
+  (<>) a b = SQLiteEngineOpts { dbName = dbName b <|> dbName a }
+
+instance IsString SQLiteEngineOpts where
+  fromString s = SQLiteEngineOpts { dbName = pure s }
+
+createEngine :: SQLiteEngineOpts -> IO SQLiteEngine
+createEngine opts = SQLiteEngine <$> open (fromMaybe ":memory:" $ dbName opts)
+
+closeEngine :: SQLiteEngine -> IO ()
+closeEngine e = close (conn e)
+
+withEngine :: SQLiteEngineOpts -> (SQLiteEngine -> IO a) -> IO a
+withEngine opts = bracket (createEngine opts) closeEngine
 
 instance (Store a, HasKey a) => SourceListAll a IO SQLiteEngine where
   listAll :: SQLiteEngine -> IO [a]
