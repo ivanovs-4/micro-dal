@@ -7,17 +7,17 @@ The lightweight Data Access Layer
 
 To decouple the programs from the specific of the data storage.
 
-To make the work with persistent data simple and able to evolve
-from naive approach during the prototyping to enterprise level
-gradually, without changing the client's code.
+To make the work with persistent data simple and able to evolve from a naive approach during the
+prototyping to enterprise level gradually, without changing the client's code.
 
-Some ideas behind this library are taken from Martin Fowler's
-books, Craig Larman's  books, some from the own experience
-and previous attempts.
+Some ideas behind this library are taken from Martin Fowler's books, Craig Larman's  books, some
+from the own experience and previous attempts.
 
 ## Status
 
 The current status of the library is under heavy development / experimental.
+
+It is being used in some internal projects, evolving this them.
 
 The current implementation has a simple and basic SQLite backend for the DAL.
 
@@ -79,7 +79,13 @@ withEngine optInMemory $ \eng -> do
 ```
 
 So far, we have the minimal set of the primitives that covers a significant
-part 
+part of the persistent data use cases.
+
+## TODO
+
+  - Implement abstraction for querying the data
+  - Make it suitable to work with relational database, including
+    complex queries, relations, indexes, etc.
 
 
 ## Cases
