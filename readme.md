@@ -58,8 +58,8 @@ newtype HashRef (ns :: Symbol) a = HashRef (Either B58 a)
                                    deriving(Eq,Ord,Show,Data,Generic)
 ```
 
-Thus, to make the data value storable, you have merely to specify the
-HashRef type for it and the instance of Store typeclass, for an instance:
+Thus, to make the data value storable, you merely have to specify the HashRef type for it and the
+instance of Store typeclass, for an instance:
 
 ```haskell
 type HashedInt = HashRef "ints" Int
