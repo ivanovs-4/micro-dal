@@ -27,7 +27,7 @@ See the cases below.
 
 The basic idea is to hide the complexity of working with different data storages like key-value
 databases or relational databases or CAS-storages or other sort of storages behind the minimalistic
-set of interfaces, without taking care if the specific of the concrete data storage, like
+set of interfaces, without taking care of the specific of the concrete data storage, like
 relational databases.
 
 The minimal stored data item has to have an identity or primary key and a possibility to be
