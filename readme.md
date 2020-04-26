@@ -7,8 +7,8 @@ The lightweight Data Access Layer
 
 To decouple the programs from the specific of the data storage.
 
-To make the work with persistent data simple and able to evolve from a naive approach during the
-prototyping to enterprise level gradually, without changing the client's code.
+To make the work with persistent data simple and provide a possibility to evolve from a naive
+approach during the prototyping to enterprise level gradually, without changing the client's code.
 
 Some ideas behind this library are taken from Martin Fowler's books, Craig Larman's  books, some
 from the own experience and previous attempts.
