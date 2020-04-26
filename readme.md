@@ -84,7 +84,7 @@ part of the persistent data use cases.
 ## TODO
 
   - Implement abstraction for querying the data
-  - Make it suitable to work with relational database, including
+  - Make it suitable to work with relational databases, including
     complex queries, relations, indexes, etc.
 
 
