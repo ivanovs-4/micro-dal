@@ -94,7 +94,7 @@ data SomeData = SomeData Word32 Word32
 -- HaskKey means that the data item has, at least
 -- a primary key and *namespace*.
 -- The primary key is a primary key,
--- namespace in case of a relational database will mean
+-- namespace in case of a relational database means
 -- a table, in a case of any other kind of storage
 -- it could mean "bag" or the namespace. I.e. it's a set
 -- of all values of the given type.
