@@ -46,7 +46,7 @@ class (Monad m, HasKey a) => SourceStore a m e where
 ```
 
 I.e. indexes and sets may be implemented as a Haskell collections of values,
-and may be stored/loaded as well as far as those values fit the memory.
+and may be stored/loaded as far as those values fit the memory.
 
 To make the moment of the memory exhaustion happen later, there is the ```HashRef```
 abstraction that represents the hash-addressed object, that may be in fully-loaded
