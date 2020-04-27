@@ -8,7 +8,7 @@ The lightweight Data Access Layer
         withTransaction eng $ do
           mapM_ (store @MyDataType eng) values
 
-		values <- listAll @MyDataType eng
+        values <- listAll @MyDataType eng
 ```
 
 ## Why
