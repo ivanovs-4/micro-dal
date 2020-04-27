@@ -3,6 +3,14 @@
 
 The lightweight Data Access Layer
 
+```haskell
+      withEngine "mydatabase.sqlite" $ \eng -> do
+        withTransaction eng $ do
+          mapM_ (store @MyDataType eng) values
+
+		values <- listAll @MyDataType eng
+```
+
 ## Why
 
 To decouple the programs from the specific of the data storage.
