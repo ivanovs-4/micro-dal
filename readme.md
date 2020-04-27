@@ -17,7 +17,7 @@ from the own experience and previous attempts.
 
 The current status of the library is under heavy development / experimental.
 
-It is being used in some internal projects, evolving this them.
+It is being used in some internal projects, evolving along with them.
 
 The current implementation has a simple and basic SQLite backend for the DAL.
 
