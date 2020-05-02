@@ -94,4 +94,26 @@ spec = do
 
       pure ()
 
+  describe "DAL delete test" $ do
+    it "stores and restores some random values using HashRef and deletes odds" $ do
+      withEngine optInMemory $ \eng -> do
+
+        replicateM_ 100 $ do
+          let ivalues = [1..1000]
+
+          forM_ ivalues $ \i -> do
+            store @HashedInt eng (hashRefPack i)
+
+          ivals <- (catMaybes . fmap hashRefUnpack) <$> listAll @HashedInt eng
+          ivals `shouldMatchList` ivalues
+
+          forM_ (filter odd ivalues) $ \v -> do
+            delete @HashedInt eng (key (hashRefPack v))
+
+          ivals2 <- (catMaybes . fmap hashRefUnpack) <$> listAll @HashedInt eng
+          ivals2 `shouldMatchList` (filter even ivalues)
+
+        pure ()
+
+      pure ()
 
