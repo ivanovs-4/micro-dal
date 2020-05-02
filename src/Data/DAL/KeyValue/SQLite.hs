@@ -86,6 +86,13 @@ instance (Store a, Store (KeyOf a), HasKey a) => SourceStore a IO SQLiteEngine w
       bkey  = encode (key v)
       bval  = encode v
 
+instance (Store a, Store (KeyOf a), HasKey a) => SourceDeleteByKey a IO SQLiteEngine where
+  delete :: SQLiteEngine -> KeyOf a -> IO ()
+  delete e k = do
+    execute (conn e) [qc|delete from {table} where k  = ?|] (Only (encode k))
+    where
+      table = nsUnpack (ns @a)
+
 instance SourceTransaction a IO SQLiteEngine where
   withTransaction e = SQLite.withTransaction (conn e)
 

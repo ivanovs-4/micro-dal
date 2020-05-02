@@ -20,8 +20,11 @@ class Monad m => SourceListAll a m e where
   listAll :: e -> m [a]
 
 class (Monad m, HasKey a) => SourceStore a m e where
-  store :: e -> a -> m (KeyOf a)
-  load :: e -> KeyOf a -> m (Maybe a)
+  store   :: e -> a -> m (KeyOf a)
+  load    :: e -> KeyOf a -> m (Maybe a)
+
+class (Monad m, HasKey a) => SourceDeleteByKey a m e where
+  delete :: e -> KeyOf a -> m ()
 
 class Monad m => SourceTransaction a m e where
   withTransaction :: e -> m a -> m a
