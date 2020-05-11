@@ -24,7 +24,7 @@ library
   other-modules:       Data.DAL.Types
 
   -- other-extensions:
-  build-depends:       base ^>=4.12.0.0
+  build-depends:       base >=4.12.0.0
                      , base58-bytestring
                      , bytestring
                      , cryptonite
