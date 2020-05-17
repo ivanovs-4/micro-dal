@@ -6,6 +6,7 @@ module Data.DAL.KeyValue.S3
 , createEngine
 -- , closeEngine
 , withEngine
+, cleanEngine
 , s3EngineOptsDev
 ) where
 
@@ -103,12 +104,26 @@ withEngine opts = bracket (createEngine opts) closeEngine
 instance (Store a, HasKey a) => SourceListAll a IO S3Engine where
   listAll :: S3Engine -> IO [a]
   listAll e = do
-      keys <- fmap (either throw id) $ runMinioWith (conn e) $ do
-          obs <- Conduit.sourceToList $ listObjects (bucket e) (Just (cs $ nsUnpack (ns @a) </> "")) False
+      keys <- either throwIO pure =<< do
+        runMinioWith (conn e) $ do
+          obs <- Conduit.sourceToList $ listObjects (bucket e) (Just (cs $ nsUnpack (ns @a) </> "")) True
           pure $ catMaybes $ obs <&> \case
                   ListItemObject oi -> Just $ oiObject oi
                   _                 -> Nothing
-      fmap catMaybes $ mapM (load' e . S3Key) keys
+      fmap catMaybes $ mapM (load'' e . S3Key) keys
+
+
+load'' :: forall a. (Store a, HasKey a) => S3Engine -> S3Key a -> IO (Maybe a)
+load'' e s3key = do
+    withSystemTempFile "micro-dal-s3" $ \filepath _ -> do
+        either handleLeft (const $ (either throwIO (pure . Just) . decode @a) =<< BS.readFile filepath) =<< do
+            runMinioWith (conn e) $ do
+                fGetObject (bucket e) (unS3Key s3key) filepath defaultGetObjectOptions
+  where
+    handleLeft = \case
+        MErrService NoSuchKey -> pure Nothing
+        e -> throwIO e
+
 
 load' :: forall a. (Store a, HasKey a) => S3Engine -> S3Key a -> IO (Maybe a)
 load' e s3key = do
@@ -133,7 +148,8 @@ instance (Store a, Store (KeyOf a), HasKey a) => SourceStore a IO S3Engine where
       withSystemTempFile "micro-dal-s3" $ \filepath h -> do
           BS.hPut h bval
           hClose h
-          fmap (either throw id) $ runMinioWith (conn e) $ do
+          either throwIO pure =<< do
+            runMinioWith (conn e) $ do
               UnliftIO.catch
                   (fPutObject (bucket e) bkey filepath defaultPutObjectOptions)
                   $ \ NoSuchBucket -> do
@@ -148,10 +164,26 @@ instance (Store a, Store (KeyOf a), HasKey a) => SourceStore a IO S3Engine where
 instance (Store a, Store (KeyOf a), HasKey a) => SourceDeleteByKey a IO S3Engine where
   delete :: S3Engine -> KeyOf a -> IO ()
   delete e k = do
-    fmap (either throw id) $
+    either throwIO pure =<< do
       runMinioWith (conn e) $ do
           removeObject (bucket e) (unS3Key $ mkS3Key @a k)
 
+
+cleanEngine :: S3Engine -> IO ()
+cleanEngine e = either throwIO pure =<< do
+  runMinioWith (conn e) $ do
+    UnliftIO.catch
+        (removeBucket (bucket e))
+      $ \case
+          (ServiceErr "BucketNotEmpty" _) -> do
+              obs <- Conduit.sourceToList $ listObjects (bucket e) Nothing True
+              mapM_ (removeObject (bucket e))
+                  $ catMaybes $ obs <&> \case
+                      ListItemObject oi -> Just $ oiObject oi
+                      _                 -> Nothing
+              removeBucket (bucket e)
+          NoSuchBucket -> pure ()
+          e -> UnliftIO.throwIO e
 
 -- instance SourceTransaction a m S3Engine where
 --   withTransaction e = error "Is not available"  -- TODO try runMinioWith (conn e)
