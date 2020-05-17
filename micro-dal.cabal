@@ -40,6 +40,7 @@ library
                      , safe
                      , sqlite-simple
                      , store
+                     , string-conversions
                      , temporary
                      , text
                      , unliftio

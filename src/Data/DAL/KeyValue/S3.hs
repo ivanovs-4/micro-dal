@@ -9,6 +9,7 @@ module Data.DAL.KeyValue.S3
 , s3EngineOptsDev
 ) where
 
+-- import System.FilePath
 import Control.Applicative ((<|>))
 import Control.Exception
 import Control.Monad
@@ -23,12 +24,12 @@ import Data.Maybe
 import Data.Monoid
 import Data.Store
 import Data.String (IsString(..))
+import Data.String.Conversions
 import Data.Text (Text)
 import Network.HTTP.Client
 import Network.HTTP.Client.TLS
 import Network.Minio
 import Safe
-import System.FilePath
 import System.IO (hClose)
 import System.IO.Temp
 
@@ -87,7 +88,7 @@ s3EngineOptsDev = S3EngineOpts
                         { s3Addr         = "http://127.0.0.1:9001"
                         , s3AccessKey    = "s3-access-key"
                         , s3SecretKey    = "s3-secret-key"
-                        , s3BucketPrefix = "dev/"
+                        , s3BucketPrefix = "dev"
                         }
 
 createEngine :: S3EngineOpts -> IO S3Engine
@@ -98,6 +99,9 @@ createEngine S3EngineOpts {..} = do
   pure $ S3Engine minioConn (T.unpack s3BucketPrefix)
   where
     toAddr = fromString . T.unpack
+
+(</>) :: (IsString c, Semigroup c, ConvertibleStrings a c, ConvertibleStrings b c) => a -> b -> c
+(</>) a b = cs a <> "" <> cs b
 
 withEngine :: S3EngineOpts -> (S3Engine -> IO a) -> IO a
 withEngine opts = bracket (createEngine opts) closeEngine
@@ -141,14 +145,11 @@ instance (Store a, Store (KeyOf a), HasKey a) => SourceStore a IO S3Engine where
           BS.hPut h bval
           hClose h
           fmap (either throw id) $ runMinioWith (conn e) $ do
-
-              -- FIXME сначала попробовать записать, поймать исключение «букета нет», создать букет, снова попробовать записать
-              -- fPutObject bucket (unS3Key bkey) filepath defaultPutObjectOptions
-
-              do
-                -- ensureBucketExists bucket
-                fPutObject bucket (unS3Key bkey) filepath defaultPutObjectOptions
-
+              UnliftIO.catch
+                  (fPutObject bucket (unS3Key bkey) filepath defaultPutObjectOptions)
+                  $ \ NoSuchBucket -> do
+                      ensureBucketExists bucket
+                      (fPutObject bucket (unS3Key bkey) filepath defaultPutObjectOptions)
               pure keyv
     where
       bucket = T.pack $ (pref e) </> nsUnpack (ns @a)
@@ -162,7 +163,7 @@ instance (Store a, Store (KeyOf a), HasKey a) => SourceDeleteByKey a IO S3Engine
     fmap (either throw id) $
       runMinioWith (conn e) $ do
           -- ensureBucketExists bucket
-          removeObject bucket (unS3Key bkey)
+          removeObject bucket (unS3Key bkey </> "as")
     where
       bucket = T.pack $ (pref e) </> nsUnpack (ns @a)
       bkey  = mkS3Key $ encode k
