@@ -11,12 +11,14 @@ module Data.DAL.KeyValue.S3
 
 import Control.Applicative ((<|>))
 import Control.Exception
+import Control.Monad
 import Control.Monad.IO.Class
 import Data.ByteString (ByteString)
 import Data.ByteString.Base58
 import Data.DAL.KeyValue.HashRef
 import Data.Either
 import Data.Function
+import Data.Functor
 import Data.Maybe
 import Data.Monoid
 import Data.Store
@@ -33,6 +35,7 @@ import System.IO.Temp
 import qualified Control.Monad.Catch as Catch
 import qualified Data.ByteArray as BA
 import qualified Data.ByteString as BS
+import qualified Data.Conduit as Conduit
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Network.Minio as Minio
@@ -103,29 +106,34 @@ withEngine opts = bracket (createEngine opts) closeEngine
     closeEngine _ = pure ()
 
 instance (Store a, HasKey a) => SourceListAll a IO S3Engine where
-  listAll :: S3Engine -> m [a]
+  listAll :: S3Engine -> IO [a]
   listAll e = do
-    undefined
-    -- execute_ (conn e) [qc|create table if not exists {table} (k blob primary key, v blob)|]
-    -- rows <- query_ (conn e) [qc|select v from {table}|] :: IO [Only ByteString]
-    -- pure $ rights $ fmap (\(Only x) -> decode @a x) rows
-    -- where
-    --   table = nsUnpack (ns @a)
+      keys <- fmap (either throw id) $ runMinioWith (conn e) $ do
+          obs <- Conduit.sourceToList $ listObjects bucket Nothing False
+          pure $ catMaybes $ obs <&> \case
+                  ListItemObject oi -> Just $ oiObject oi
+                  _                 -> Nothing
+      fmap catMaybes $ mapM (load' e . S3Key) keys
+    where
+      bucket = T.pack $ (pref e) </> nsUnpack (ns @a)
+
+load' :: forall a. (Store a, HasKey a) => S3Engine -> S3Key -> IO (Maybe a)
+load' e bkey = do
+    withSystemTempFile "micro-dal-s3" $ \filepath _ -> do
+        either handleLeft (const $ (either (const Nothing) Just . decode @a) <$> BS.readFile filepath) =<< do
+            runMinioWith (conn e) $ do
+                fGetObject bucket (unS3Key bkey) filepath defaultGetObjectOptions
+  where
+    bucket = T.pack $ (pref e) </> nsUnpack (ns @a)
+    handleLeft = \case
+        MErrService NoSuchKey -> pure Nothing
+        e -> throwIO e
 
 instance (Store a, Store (KeyOf a), HasKey a) => SourceStore a IO S3Engine where
   load :: S3Engine -> KeyOf a -> IO (Maybe a)
-  load e k = do
-      withSystemTempFile "micro-dal-s3" $ \filepath _ -> do
-          either handleLeft (const $ (either (const Nothing) Just . decode @a) <$> BS.readFile filepath) =<< do
-              runMinioWith (conn e) $ do
-                  fGetObject bucket (unS3Key bkey) filepath defaultGetObjectOptions
+  load e k = load' e bkey
     where
-      bucket = T.pack $ (pref e) </> nsUnpack (ns @a)
       bkey  = mkS3Key $ encode k
-
-      handleLeft = \case
-          MErrService NoSuchKey -> pure Nothing
-          e -> throwIO e
 
   store :: S3Engine -> a -> IO (KeyOf a)
   store e v = do
@@ -158,6 +166,10 @@ instance (Store a, Store (KeyOf a), HasKey a) => SourceDeleteByKey a IO S3Engine
     where
       bucket = T.pack $ (pref e) </> nsUnpack (ns @a)
       bkey  = mkS3Key $ encode k
+
+
+-- mkBucket :: forall a. HasKey a => Proxy a -> S3Engine -> Text
+-- mkBucket _ e = T.pack $ (pref e) </> nsUnpack (ns @a)
 
 
 -- instance SourceTransaction a m S3Engine where
