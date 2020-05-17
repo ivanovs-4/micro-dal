@@ -71,12 +71,8 @@ library
                      , TypeFamilies
 
 
-
-test-suite micro-dal-test
+common deps-test
     default-language:    Haskell2010
-    type:       exitcode-stdio-1.0
-    main-is:    Spec.hs
-
     default-extensions:  BangPatterns
                        , ConstraintKinds
                        , DataKinds
@@ -94,9 +90,6 @@ test-suite micro-dal-test
                        , ScopedTypeVariables
                        , TypeApplications
                        , TypeFamilies
-
-    other-modules: Data.DAL.DALSpec
-    hs-source-dirs: test
     build-depends: base >= 4 && < 5, micro-dal
                  , containers
                  , hspec
@@ -106,7 +99,21 @@ test-suite micro-dal-test
                  , store
                  , text
 
+test-suite micro-dal-test
+    import: deps-test
+    type:       exitcode-stdio-1.0
+    main-is:    Spec.hs
+    other-modules: Data.DAL.DALSpec
+    hs-source-dirs: test
     build-tool-depends: hspec-discover:hspec-discover == 2.*
 
+
+executable micro-dal-test-s3
+  import: deps-test
+  main-is:             Data/DAL/DALTestS3.hs
+  build-depends:
+  hs-source-dirs:      test
+  ghc-options:
+    -threaded
 
 
