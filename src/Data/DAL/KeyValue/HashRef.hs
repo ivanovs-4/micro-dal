@@ -18,6 +18,9 @@ import Data.DAL.Types
 newtype B58 = B58 ByteString
               deriving(Eq,Ord,Data,Generic)
 
+unB58 :: B58 -> ByteString
+unB58 (B58 s) = s
+
 instance Store B58
 
 instance Show B58 where

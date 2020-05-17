@@ -29,6 +29,8 @@ library
                      , base58-bytestring
                      , bytestring
                      , cryptonite
+                     , exceptions
+                     , filepath
                      , http-client
                      , http-client-tls
                      , interpolatedstring-perl6
@@ -37,7 +39,9 @@ library
                      , safe
                      , sqlite-simple
                      , store
+                     , temporary
                      , text
+                     , unliftio
 
   hs-source-dirs:      src
   default-language:    Haskell2010
@@ -54,9 +58,11 @@ library
                      , FunctionalDependencies
                      , GeneralizedNewtypeDeriving
                      , InstanceSigs
+                     , LambdaCase
                      , MultiParamTypeClasses
                      , OverloadedStrings
                      , QuantifiedConstraints
+                     , RecordWildCards
                      , ScopedTypeVariables
                      , StandaloneDeriving
                      , TypeApplications
