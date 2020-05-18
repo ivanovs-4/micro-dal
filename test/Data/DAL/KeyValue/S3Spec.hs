@@ -1,12 +1,14 @@
-module Main where
+module Data.DAL.KeyValue.S3Spec (spec) where
 
 import Control.Monad
+import Control.Monad.IO.Class
 import Data.Data
 import Data.List (sort)
 import Data.Map (Map)
 import Data.Maybe
 import Data.Set (Set)
 import Data.Store
+import Data.String.Conversions (cs)
 import Data.Text (Text)
 import Data.Word
 import GHC.Generics
@@ -18,9 +20,11 @@ import Test.Hspec.Expectations
 import Test.QuickCheck
 import Test.QuickCheck.Arbitrary
 
+import Test.Hspec (Spec, SpecWith, hspec, before, describe, it, shouldBe)
+import Test.Hspec.NeedEnv (EnvMode(Want), needEnv, needEnvRead)
+
 import Data.DAL
 import Data.DAL.KeyValue.HashRef
-
 import Data.DAL.KeyValue.S3
 
 data SomeData = SomeData Word32 Word32
@@ -45,16 +49,26 @@ instance Store HashedInt
 instance Arbitrary SomeData where
   arbitrary = SomeData <$> arbitrary <*> arbitrary
 
-engOps = s3EngineOptsDev { s3BucketPrefix = "test" }
+getEnvs :: IO S3EngineOpts
+getEnvs = do
+    s3Addr      <- cs <$> needEnv mode "TEST_S3_ADDR"
+    s3AccessKey <- cs <$> needEnv mode "TEST_S3_ACCESS_KEY"
+    s3SecretKey <- cs <$> needEnv mode "TEST_S3_SECRET_KEY"
+    s3Bucket    <- cs <$> needEnv mode "TEST_S3_BUCKET"
+    pure S3EngineOpts {..}
+    where
+      mode = Want
 
-main :: IO ()
-main = do
-  -- describe "DAL simple load/store test" $ do
-  --   it "stores some random SomeData values and restores them" $ do
+spec :: Spec
+spec = before (createEngine =<< getEnvs) specWithS3
 
-      withEngine engOps $ \eng -> do
+specWithS3 :: SpecWith S3Engine
+specWithS3 = do
 
-        replicateM_ 5 $ do
+  describe "DAL S3 simple load/store test" $ do
+    it "stores some random SomeData values and restores them" $ \eng -> do
+
+      replicateM_ 5 $ do
 
           v1 <- generate arbitrary :: IO SomeData
           k1 <- store eng v1
@@ -63,11 +77,10 @@ main = do
           v2 `shouldBe` Just v1
 
 
-  -- describe "DAL simple store/loadAll test" $ do
-  --   it "stores some random SomeData values and restores them" $ do
+  describe "DAL S3 simple store/loadAll test" $ do
+    it "stores some random SomeData values and restores them" $ \eng -> do
 
       replicateM_ 3 $ do
-        withEngine engOps $ \eng -> do
           cleanEngine eng
 
           els  <- Map.fromList <$> generate arbitrary :: IO (Map Word32 Word32)
@@ -78,11 +91,10 @@ main = do
           (sort vals2) `shouldMatchList` (sort vals)
 
 
-  -- describe "DAL HashRef test" $ do
-  --   it "stores and restores some random values using HashRef" $ do
+  describe "DAL S3 HashRef test" $ do
+    it "stores and restores some random values using HashRef" $ \eng -> do
 
       replicateM_ 10 $ do
-        withEngine engOps $ \eng -> do
           cleanEngine eng
 
           ivalues <- generate arbitrary :: IO [Int]
@@ -92,11 +104,10 @@ main = do
             Just i `shouldBe` (fromJust $ hashRefUnpack <$> ii)
 
 
-  -- describe "DAL delete test" $ do
-  --   it "stores and restores some random values using HashRef and deletes odds" $ do
+  describe "DAL S3 delete test" $ do
+    it "stores and restores some random values using HashRef and deletes odds" $ \eng -> do
 
       replicateM_ 3 $ do
-        withEngine engOps $ \eng -> do
           cleanEngine eng
 
           let ivalues = [1..100]
@@ -116,4 +127,4 @@ main = do
           ivals2 `shouldMatchList` (filter even ivalues)
 
 
-      withEngine engOps cleanEngine
+      cleanEngine eng

@@ -21,9 +21,12 @@ in pkgs.haskellPackages.shellFor {
       trap exit INT TERM
       trap cleanup EXIT
 
-      export MINIO_ACCESS_KEY="s3-access-key"
-      export MINIO_SECRET_KEY="s3-secret-key"
-      minio --compat server --address :9001 ./storage &
+      export TEST_S3_ADDR="http://127.0.0.1:9001"
+      export TEST_S3_ACCESS_KEY="s3-access-key"
+      export TEST_S3_SECRET_KEY="s3-secret-key"
+      export TEST_S3_BUCKET="test"
+
+      minio --compat server --address :9001 ./storage > /dev/null &
       sleep 1
     '';
 

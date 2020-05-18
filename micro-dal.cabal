@@ -70,7 +70,13 @@ library
                      , TypeFamilies
 
 
-common deps-test
+test-suite micro-dal-test
+    type:       exitcode-stdio-1.0
+    hs-source-dirs: test
+    main-is:    Spec.hs
+    other-modules: Data.DAL.DALSpec
+                 , Data.DAL.KeyValue.S3Spec
+    build-tool-depends: hspec-discover:hspec-discover == 2.*
     default-language:    Haskell2010
     default-extensions:  BangPatterns
                        , ConstraintKinds
@@ -86,6 +92,7 @@ common deps-test
                        , MultiParamTypeClasses
                        , OverloadedStrings
                        , QuantifiedConstraints
+                       , RecordWildCards
                        , ScopedTypeVariables
                        , TypeApplications
                        , TypeFamilies
@@ -94,25 +101,8 @@ common deps-test
                  , hspec
                  , hspec-discover
                  , hspec-expectations
+                 , hspec-need-env
                  , QuickCheck
                  , store
+                 , string-conversions
                  , text
-
-test-suite micro-dal-test
-    import: deps-test
-    type:       exitcode-stdio-1.0
-    main-is:    Spec.hs
-    other-modules: Data.DAL.DALSpec
-    hs-source-dirs: test
-    build-tool-depends: hspec-discover:hspec-discover == 2.*
-
-
-executable micro-dal-test-s3
-  import: deps-test
-  main-is:             Data/DAL/DALTestS3.hs
-  build-depends:
-  hs-source-dirs:      test
-  ghc-options:
-    -threaded
-
-
