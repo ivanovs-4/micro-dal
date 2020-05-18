@@ -32,32 +32,18 @@ import Network.Minio
 import Safe
 import System.FilePath
 import System.IO (hClose)
-import System.IO.Temp
 
 import qualified Control.Monad.Catch as Catch
 import qualified Data.ByteArray as BA
 import qualified Data.ByteString as BS
 import qualified Data.Conduit as Conduit
+import qualified Conduit as Conduit
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Network.Minio as Minio
 import qualified UnliftIO -- (bracket, throwIO, try)
 
 import Data.DAL.Types
-
-toHex :: B58 -> Text
-toHex = TE.decodeUtf8 . encodeBase58 bitcoinAlphabet . unB58
-
-ensureBucketExists :: Bucket -> Minio ()
-ensureBucketExists b = do
-    -- Make a bucket; catch bucket already exists exception if thrown.
-    bErr <- UnliftIO.try $ makeBucket b Nothing
-    -- If the bucket already exists, we would get a specific
-    -- `ServiceErr` exception thrown.
-    case bErr of
-        Left BucketAlreadyOwnedByYou -> pure ()
-        Left e                       -> UnliftIO.throwIO e
-        Right _                      -> pure ()
 
 
 newtype S3Key a = S3Key Text
@@ -104,40 +90,30 @@ withEngine opts = bracket (createEngine opts) closeEngine
 instance (Store a, HasKey a) => SourceListAll a IO S3Engine where
   listAll :: S3Engine -> IO [a]
   listAll e = do
-      keys <- either throwIO pure =<< do
-        runMinioWith (conn e) $ do
-          obs <- Conduit.sourceToList $ listObjects (bucket e) (Just (cs $ nsUnpack (ns @a) </> "")) True
-          pure $ catMaybes $ obs <&> \case
-                  ListItemObject oi -> Just $ oiObject oi
-                  _                 -> Nothing
-      fmap catMaybes $ mapM (load'' e . S3Key) keys
-
-
-load'' :: forall a. (Store a, HasKey a) => S3Engine -> S3Key a -> IO (Maybe a)
-load'' e s3key = do
-    withSystemTempFile "micro-dal-s3" $ \filepath _ -> do
-        either handleLeft (const $ (either throwIO (pure . Just) . decode @a) =<< BS.readFile filepath) =<< do
+        keys <- either throwIO pure =<< do
             runMinioWith (conn e) $ do
-                fGetObject (bucket e) (unS3Key s3key) filepath defaultGetObjectOptions
-  where
-    handleLeft = \case
-        MErrService NoSuchKey -> pure Nothing
-        e -> throwIO e
-
+              let prefix = cs $ nsUnpack (ns @a) </> ""
+              obs <- Conduit.sourceToList $ listObjects (bucket e) (Just prefix) True
+              pure $ catMaybes $ obs <&> \case
+                      ListItemObject oi -> Just $ S3Key (oiObject oi)
+                      _                 -> Nothing
+        catMaybes <$> mapM (load' e) keys
 
 load' :: forall a. (Store a, HasKey a) => S3Engine -> S3Key a -> IO (Maybe a)
 load' e s3key = do
-    withSystemTempFile "micro-dal-s3" $ \filepath _ -> do
-        either handleLeft (const $ (either (const Nothing) Just . decode @a) <$> BS.readFile filepath) =<< do
-            runMinioWith (conn e) $ do
-                fGetObject (bucket e) (unS3Key s3key) filepath defaultGetObjectOptions
-  where
-    handleLeft = \case
-        MErrService NoSuchKey -> pure Nothing
-        e -> throwIO e
+    either handleLeft (pure . (decodeMay <=< headMay)) =<< do
+        runMinioWith (conn e) $ do
+            resp <- getObject (bucket e) (unS3Key s3key) defaultGetObjectOptions
+            Conduit.sourceToList (gorObjectStream resp)
+    where
+      handleLeft = \case
+          MErrService NoSuchKey -> pure Nothing
+          e -> throwIO e
+      decodeMay :: ByteString -> Maybe a
+      decodeMay = either (const Nothing) Just . decode @a
 
 mkS3Key :: forall a. (HasKey a, Store (KeyOf a)) => KeyOf a -> S3Key a
-mkS3Key k = S3Key $ cs $ nsUnpack (ns @a) </> cs (toHex . B58 . encode $ k)
+mkS3Key k = S3Key $ cs $ nsUnpack (ns @a) </> (cs . encodeBase58 bitcoinAlphabet . encode $ k)
 
 instance (Store a, Store (KeyOf a), HasKey a) => SourceStore a IO S3Engine where
   load :: S3Engine -> KeyOf a -> IO (Maybe a)
@@ -145,17 +121,14 @@ instance (Store a, Store (KeyOf a), HasKey a) => SourceStore a IO S3Engine where
 
   store :: S3Engine -> a -> IO (KeyOf a)
   store e v = do
-      withSystemTempFile "micro-dal-s3" $ \filepath h -> do
-          BS.hPut h bval
-          hClose h
-          either throwIO pure =<< do
-            runMinioWith (conn e) $ do
-              UnliftIO.catch
-                  (fPutObject (bucket e) bkey filepath defaultPutObjectOptions)
-                  $ \ NoSuchBucket -> do
-                      ensureBucketExists (bucket e)
-                      (fPutObject (bucket e) bkey filepath defaultPutObjectOptions)
-              pure keyv
+      either throwIO pure =<< do
+        runMinioWith (conn e) $ do
+          UnliftIO.catch
+              (putObject (bucket e) bkey (Conduit.yield bval) Nothing defaultPutObjectOptions)
+              $ \ NoSuchBucket -> do
+                  ensureBucketExists (bucket e)
+                  (putObject (bucket e) bkey (Conduit.yield bval) Nothing defaultPutObjectOptions)
+          pure keyv
     where
       keyv = key v
       bkey = unS3Key $ mkS3Key @a keyv
@@ -167,7 +140,6 @@ instance (Store a, Store (KeyOf a), HasKey a) => SourceDeleteByKey a IO S3Engine
     either throwIO pure =<< do
       runMinioWith (conn e) $ do
           removeObject (bucket e) (unS3Key $ mkS3Key @a k)
-
 
 cleanEngine :: S3Engine -> IO ()
 cleanEngine e = either throwIO pure =<< do
@@ -185,5 +157,13 @@ cleanEngine e = either throwIO pure =<< do
           NoSuchBucket -> pure ()
           e -> UnliftIO.throwIO e
 
--- instance SourceTransaction a m S3Engine where
---   withTransaction e = error "Is not available"  -- TODO try runMinioWith (conn e)
+ensureBucketExists :: Bucket -> Minio ()
+ensureBucketExists b = do
+    -- Make a bucket; catch bucket already exists exception if thrown.
+    bErr <- UnliftIO.try $ makeBucket b Nothing
+    -- If the bucket already exists, we would get a specific
+    -- `ServiceErr` exception thrown.
+    case bErr of
+        Left BucketAlreadyOwnedByYou -> pure ()
+        Left e                       -> UnliftIO.throwIO e
+        Right _                      -> pure ()

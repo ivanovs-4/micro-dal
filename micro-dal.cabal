@@ -41,7 +41,6 @@ library
                      , sqlite-simple
                      , store
                      , string-conversions
-                     , temporary
                      , text
                      , unliftio
 
