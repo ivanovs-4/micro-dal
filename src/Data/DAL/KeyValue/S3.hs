@@ -58,7 +58,7 @@ data S3Engine = S3Engine
                         }
 
 data S3EngineOpts = S3EngineOpts
-                        { s3Addr      :: Text
+                        { s3Address   :: Text
                         , s3AccessKey :: Text
                         , s3SecretKey :: Text
                         , s3Bucket    :: Text
@@ -68,7 +68,7 @@ data S3EngineOpts = S3EngineOpts
 
 s3EngineOptsDev :: S3EngineOpts
 s3EngineOptsDev = S3EngineOpts
-                        { s3Addr      = "http://127.0.0.1:9001"
+                        { s3Address   = "http://127.0.0.1:9001"
                         , s3AccessKey = "s3-access-key"
                         , s3SecretKey = "s3-secret-key"
                         , s3Bucket    = "dev"
@@ -79,7 +79,7 @@ createEngine :: S3EngineOpts -> IO S3Engine
 createEngine S3EngineOpts {..} = do
   manager <- newManager tlsManagerSettings
   let minioConnectionInfo =
-          toAddr s3Addr
+          toAddr s3Address
         & Minio.setCreds (Minio.Credentials s3AccessKey s3SecretKey)
         & Minio.setRegion s3Region
   minioConn <- Minio.mkMinioConn minioConnectionInfo manager

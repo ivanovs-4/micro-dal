@@ -51,7 +51,7 @@ instance Arbitrary SomeData where
 
 getEnvs :: IO S3EngineOpts
 getEnvs = do
-    s3Addr      <- cs <$> needEnv mode "TEST_S3_ADDR"
+    s3Address   <- cs <$> needEnv mode "TEST_S3_ADDR"
     s3AccessKey <- cs <$> needEnv mode "TEST_S3_ACCESS_KEY"
     s3SecretKey <- cs <$> needEnv mode "TEST_S3_SECRET_KEY"
     s3Bucket    <- cs <$> needEnv mode "TEST_S3_BUCKET"
