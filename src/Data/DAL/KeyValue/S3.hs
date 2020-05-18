@@ -150,18 +150,11 @@ instance (Store a, Store (KeyOf a), HasKey a) => SourceDeleteByKey a IO S3Engine
 cleanEngine :: S3Engine -> IO ()
 cleanEngine e = either throwIO pure =<< do
   runMinioWith (conn e) $ do
-    UnliftIO.catch
-        (removeBucket (bucket e))
-      $ \case
-          (ServiceErr "BucketNotEmpty" _) -> do
-              obs <- Conduit.sourceToList $ listObjects (bucket e) Nothing True
-              mapM_ (removeObject (bucket e))
-                  $ catMaybes $ obs <&> \case
-                      ListItemObject oi -> Just $ oiObject oi
-                      _                 -> Nothing
-              removeBucket (bucket e)
-          NoSuchBucket -> pure ()
-          e -> UnliftIO.throwIO e
+      obs <- Conduit.sourceToList $ listObjects (bucket e) Nothing True
+      mapM_ (removeObject (bucket e))
+          $ catMaybes $ obs <&> \case
+              ListItemObject oi -> Just $ oiObject oi
+              _                 -> Nothing
 
 ensureBucketExists :: Bucket -> Minio ()
 ensureBucketExists b = do
