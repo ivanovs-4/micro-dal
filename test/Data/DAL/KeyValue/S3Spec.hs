@@ -81,7 +81,7 @@ specWithS3 = do
   describe "DAL S3 simple store/loadAll test" $ do
     it "stores some random SomeData values and restores them" $ \eng -> do
 
-      replicateM_ 3 $ do
+      replicateM_ 1 $ do
           cleanEngine eng
 
           els  <- Map.fromList <$> generate arbitrary :: IO (Map Word32 Word32)
@@ -95,7 +95,7 @@ specWithS3 = do
   describe "DAL S3 HashRef test" $ do
     it "stores and restores some random values using HashRef" $ \eng -> do
 
-      replicateM_ 10 $ do
+      replicateM_ 2 $ do
           cleanEngine eng
 
           ivalues <- generate arbitrary :: IO [Int]
@@ -108,10 +108,10 @@ specWithS3 = do
   describe "DAL S3 delete test" $ do
     it "stores and restores some random values using HashRef and deletes odds" $ \eng -> do
 
-      replicateM_ 3 $ do
+      replicateM_ 2 $ do
           cleanEngine eng
 
-          let ivalues = [1..100]
+          let ivalues = [1..10]
 
           forM_ ivalues $ \i -> do
             store @HashedInt eng (hashRefPack i)

@@ -19,6 +19,7 @@ let
     '';
   haskOverrides = new: old: rec {
     micro-dal = new.callCabal2nix "micro-dal" (ignore ./.) {};
+    minio-hs = new.callPackage ./derivations/minio-hs.nix {};
   };
 in {
   inherit pkgs;
