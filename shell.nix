@@ -25,6 +25,7 @@ in pkgs.haskellPackages.shellFor {
       export TEST_S3_ACCESS_KEY="s3-access-key"
       export TEST_S3_SECRET_KEY="s3-secret-key"
       export TEST_S3_BUCKET="test"
+      export TEST_S3_REGION="ru"
 
       minio --compat server --address :9001 ./storage > /dev/null &
       sleep 1

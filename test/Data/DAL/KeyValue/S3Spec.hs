@@ -55,6 +55,7 @@ getEnvs = do
     s3AccessKey <- cs <$> needEnv mode "TEST_S3_ACCESS_KEY"
     s3SecretKey <- cs <$> needEnv mode "TEST_S3_SECRET_KEY"
     s3Bucket    <- cs <$> needEnv mode "TEST_S3_BUCKET"
+    s3Region    <- cs <$> needEnv mode "TEST_S3_REGION"
     pure S3EngineOpts {..}
     where
       mode = Want
