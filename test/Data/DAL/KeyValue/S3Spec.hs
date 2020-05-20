@@ -129,3 +129,14 @@ specWithS3 = do
 
 
       cleanEngine eng
+
+  describe "DAL S3 load nonexistent object" $ do
+    it "tries to load nonexistent key" $ \eng -> do
+
+          cleanEngine eng
+
+          v <- generate arbitrary :: IO SomeData
+
+          v' <- load @SomeData eng (key v)
+
+          v' `shouldBe` Nothing

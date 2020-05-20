@@ -1,5 +1,6 @@
 {-# LANGUAGE QuasiQuotes, ExtendedDefaultRules #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ViewPatterns #-}
 module Data.DAL.KeyValue.S3
 ( S3Engine
 , S3EngineOpts(..)
@@ -77,7 +78,9 @@ s3EngineOptsDev = S3EngineOpts
 
 createEngine :: S3EngineOpts -> IO S3Engine
 createEngine S3EngineOpts {..} = do
-  manager <- newManager tlsManagerSettings
+  manager <- newManager $ tlsManagerSettings {
+              managerResponseTimeout = responseTimeoutMicro (5 * (10^6))
+            }
   let minioConnectionInfo =
           toAddr s3Address
         & Minio.setCreds (Minio.Credentials s3AccessKey s3SecretKey)
@@ -96,34 +99,42 @@ withEngine opts = bracket (createEngine opts) closeEngine
 instance (Store a, HasKey a) => SourceListAll a IO S3Engine where
   listAll :: S3Engine -> IO [a]
   listAll e = do
-        keys <- either throwIO pure =<< do
-            runMinioWith (conn e) $ do
+      either throwIO pure =<< do
+          runMinioWith (conn e) $ do
               let prefix = cs $ nsUnpack (ns @a) </> ""
-              obs <- Conduit.sourceToList $ listObjects (bucket e) (Just prefix) True
-              pure $ catMaybes $ obs <&> \case
-                      ListItemObject oi -> Just $ S3Key (oiObject oi)
-                      _                 -> Nothing
-        catMaybes <$> mapM (load' e) keys
+              keys <- fmap (catMaybes . fmap listItemObjectToJustKey)
+                    $ Conduit.sourceToList $ listObjects (bucket e) (Just prefix) True
+              fmap catMaybes $ forM keys $ \s3key -> do
+                  fmap (decodeMay <=< headMay)
+                      $ Conduit.sourceToList . gorObjectStream
+                          =<< getObject (bucket e) (unS3Key s3key) defaultGetObjectOptions
+      where
+        decodeMay :: ByteString -> Maybe a
+        decodeMay = either (const Nothing) Just . decode @a
 
-load' :: forall a. (Store a, HasKey a) => S3Engine -> S3Key a -> IO (Maybe a)
-load' e s3key = do
-    either handleLeft (pure . (decodeMay <=< headMay)) =<< do
-        runMinioWith (conn e) $ do
-            resp <- getObject (bucket e) (unS3Key s3key) defaultGetObjectOptions
-            Conduit.sourceToList (gorObjectStream resp)
-    where
-      handleLeft = \case
-          MErrService NoSuchKey -> pure Nothing
-          e -> throwIO e
-      decodeMay :: ByteString -> Maybe a
-      decodeMay = either (const Nothing) Just . decode @a
+listItemObjectToJustKey :: ListItem -> Maybe (S3Key a)
+listItemObjectToJustKey = \case
+      ListItemObject oi -> Just $ S3Key (oiObject oi)
+      _                 -> Nothing
 
 mkS3Key :: forall a. (HasKey a, Store (KeyOf a)) => KeyOf a -> S3Key a
 mkS3Key k = S3Key $ cs $ nsUnpack (ns @a) </> (cs . encodeBase58 bitcoinAlphabet . encode $ k)
 
 instance (Store a, Store (KeyOf a), HasKey a) => SourceStore a IO S3Engine where
   load :: S3Engine -> KeyOf a -> IO (Maybe a)
-  load e k = load' e $ mkS3Key k
+  load e (mkS3Key -> s3key) = do
+    either throwIO (pure . (decodeMay <=< headMay)) =<< do
+        runMinioWith (conn e) $ do
+            x <- Conduit.sourceToList $ listObjects (bucket e) (Just $ unS3Key s3key) False
+            if null x
+              then pure []
+              else do
+                  Conduit.sourceToList . gorObjectStream
+                      =<< getObject (bucket e) (unS3Key s3key) defaultGetObjectOptions
+    where
+      decodeMay :: ByteString -> Maybe a
+      decodeMay = either (const Nothing) Just . decode @a
+
 
   store :: S3Engine -> a -> IO (KeyOf a)
   store e v = do
@@ -150,11 +161,11 @@ instance (Store a, Store (KeyOf a), HasKey a) => SourceDeleteByKey a IO S3Engine
 cleanEngine :: S3Engine -> IO ()
 cleanEngine e = either throwIO pure =<< do
   runMinioWith (conn e) $ do
+    isExists <- bucketExists (bucket e)
+    when isExists $ do
       obs <- Conduit.sourceToList $ listObjects (bucket e) Nothing True
       mapM_ (removeObject (bucket e))
-          $ catMaybes $ obs <&> \case
-              ListItemObject oi -> Just $ oiObject oi
-              _                 -> Nothing
+          $ catMaybes $ fmap unS3Key . listItemObjectToJustKey <$> obs
 
 ensureBucketExists :: Bucket -> Minio ()
 ensureBucketExists b = do
