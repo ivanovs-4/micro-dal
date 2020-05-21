@@ -17,6 +17,7 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Data.ByteString (ByteString)
 import Data.ByteString.Base58
+import Data.Conduit ((.|))
 import Data.DAL.KeyValue.HashRef
 import Data.Either
 import Data.Function
@@ -34,11 +35,12 @@ import Safe
 import System.FilePath
 import System.IO (hClose)
 
+import qualified Conduit as Conduit
 import qualified Control.Monad.Catch as Catch
 import qualified Data.ByteArray as BA
 import qualified Data.ByteString as BS
 import qualified Data.Conduit as Conduit
-import qualified Conduit as Conduit
+import qualified Data.Conduit.Combinators as Conduit
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Network.Minio as Minio
@@ -101,6 +103,9 @@ instance (Store a, HasKey a) => SourceListAll a IO S3Engine where
   listAll e = do
       either throwIO pure =<< do
           runMinioWith (conn e) $ do
+            isExists <- bucketExists (bucket e)
+            if (not isExists) then pure []
+            else do
               let prefix = cs $ nsUnpack (ns @a) </> ""
               keys <- fmap (catMaybes . fmap listItemObjectToJustKey)
                     $ Conduit.sourceToList $ listObjects (bucket e) (Just prefix) True
@@ -125,7 +130,10 @@ instance (Store a, Store (KeyOf a), HasKey a) => SourceStore a IO S3Engine where
   load e (mkS3Key -> s3key) = do
     either throwIO (pure . (decodeMay <=< headMay)) =<< do
         runMinioWith (conn e) $ do
-            x <- Conduit.sourceToList $ listObjects (bucket e) (Just $ unS3Key s3key) False
+            isExists <- bucketExists (bucket e)
+            x <- if isExists
+              then Conduit.sourceToList $ Conduit.take 1 .|  listObjects (bucket e) (Just $ unS3Key s3key) False
+              else pure []
             if null x
               then pure []
               else do
