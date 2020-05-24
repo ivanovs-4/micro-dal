@@ -2,7 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
 module Data.DAL.KeyValue.S3
-( S3Engine
+( S3Engine(..)
 , S3EngineOpts(..)
 , createEngine
 -- , closeEngine
@@ -56,9 +56,12 @@ unS3Key :: S3Key a -> Text
 unS3Key (S3Key k) = k
 
 data S3Engine = S3Engine
-                        { conn   :: Minio.MinioConn
-                        , bucket :: Text
+                        { s3Engine'conn   :: Minio.MinioConn
+                        , s3Engine'Bucket :: Text
                         }
+
+conn = s3Engine'conn
+bucket = s3Engine'Bucket
 
 data S3EngineOpts = S3EngineOpts
                         { s3Address   :: Text
