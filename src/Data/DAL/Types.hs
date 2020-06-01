@@ -1,5 +1,6 @@
 module Data.DAL.Types where
 
+import Data.Proxy
 import Data.String(IsString(..))
 
 newtype NS a = NS { nsUnpack :: String }
@@ -25,6 +26,9 @@ class (Monad m, HasKey a) => SourceStore a m e where
 
 class (Monad m, HasKey a) => SourceDeleteByKey a m e where
   delete :: e -> KeyOf a -> m ()
+
+class (Monad m, HasKey a) => SourceDeleteAll a m e where
+  deleteAll :: Proxy a -> e -> m ()
 
 class Monad m => SourceTransaction a m e where
   withTransaction :: e -> m a -> m a
