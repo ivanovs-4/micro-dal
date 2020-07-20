@@ -1,5 +1,6 @@
 module Data.DAL.Types where
 
+import Data.Int
 import Data.Proxy
 import Data.String(IsString(..))
 
@@ -30,6 +31,8 @@ class (Monad m, HasKey a) => SourceDeleteByKey a m e where
 class (Monad m, HasKey a) => SourceDeleteAll a m e where
   deleteAll :: Proxy a -> e -> m ()
 
+class (Monad m, HasKey a) => SourceCountAll a m e where
+  countAll :: Proxy a -> e -> m Int64
+
 class Monad m => SourceTransaction a m e where
   withTransaction :: e -> m a -> m a
-
