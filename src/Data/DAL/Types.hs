@@ -21,6 +21,12 @@ class HasKey a where
 class Monad m => SourceListAll a m e where
   listAll :: e -> m [a]
 
+class Monad m => SourceListOffsetLimit a m e where
+  listOffsetLimit :: e -> Int -> Int -> m [a]
+
+class Monad m => SourceQueryAll a q m e where
+  queryAll :: e -> q -> m [a]
+
 class (Monad m, HasKey a) => SourceStore a m e where
   store   :: e -> a -> m (KeyOf a)
   load    :: e -> KeyOf a -> m (Maybe a)
