@@ -42,3 +42,14 @@ class (Monad m, HasKey a) => SourceCountAll a m e where
 
 class Monad m => SourceTransaction a m e where
   withTransaction :: e -> m a -> m a
+
+data KV k v = KV k v
+  deriving(Eq,Ord,Show)
+
+class KeyValNS k v where
+  keyValNS :: NS (KV k v)
+
+class (Monad m) => SourceKVStore k v m e where
+  storeKV  :: e -> k -> v -> m ()
+  loadK    :: e -> k -> m (Maybe v)
+  listKeys :: e -> v -> m [k]
